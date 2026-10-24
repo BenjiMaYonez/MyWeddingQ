@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ניהול חתונה — דשבורד</title>
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#2b2622; --muted:#7a7168; --gold:#b08d57; --bg:#faf7f2; --card:#fff; --line:#e8e0d5; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Heebo,system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:1080px; margin:0 auto; padding:24px 20px 64px; }
+  h1 { font-family:"Frank Ruhl Libre",serif; font-size:32px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; }
+  .card .n { font-size:30px; font-weight:700; }
+  .card .l { color:var(--muted); font-size:14px; }
+  .box { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; margin-bottom:20px; }
+  .box h2 { font-family:"Frank Ruhl Libre",serif; margin:0 0 12px; font-size:22px; }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  th, td { text-align:right; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--muted); font-weight:500; }
+  input, textarea, select { font-family:inherit; font-size:15px; padding:9px 12px; border:1.5px solid var(--line); border-radius:10px; width:100%; }
+  textarea { min-height:90px; }
+  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-bottom:10px; }
+  button { font-family:inherit; font-size:15px; padding:9px 16px; border-radius:999px; border:1.5px solid var(--line); background:#fff; cursor:pointer; }
+  button.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
+  button.wa { background:#25D366; color:#fff; border-color:#25D366; font-weight:700; }
+  button:disabled { opacity:.5; }
+  .msg { padding:12px; border-radius:12px; margin-top:12px; display:none; white-space:pre-line; }
+  .msg.show { display:block; background:#eef6ee; color:#2e6b34; }
+  .msg.err { background:#fbeeee; color:#8a2c2c; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:13px; }
+  .b-yes { background:#e2f2e2; } .b-no { background:#fbe4e4; } .b-maybe { background:#fdf3d8; } .b-none { background:#eee; color:var(--muted); }
+  .tools { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .tools input { width:auto; flex:1; min-width:200px; }
+  .small { font-size:13px; color:var(--muted); }
+  details { margin-top:12px; }
+  details summary { cursor:pointer; font-weight:700; }
+  .sendall-list { display:grid; gap:8px; margin-top:12px; }
+  .sendall-list .item { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💍 דשבורד החתונה</h1>
+  <p class="sub">כאן מנהלים את רשימת המוזמנים, רואים תשובות בזמן אמת ושולחים קישורים בוואטסאפ.</p>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="box">
+    <h2>שליחה בוואטסאפ</h2>
+    <p class="small">מצב נוכחי: <b id="providerLabel"></b> — בכפתור "שלח" נפתח וואטסאפ עם הודעה מוכנה (כולל שם וקישור אישי), ואתם לוחצים "שלח". אחרי חיבור שירות שליחה אוטומטי (בהגדרות למטה), אותו כפתור ישלח אוטומטית בלי לפתוח וואטסאפ.</p>
+    <div class="tools">
+      <button class="wa" id="sendAllBtn">📲 שלח לכולם (מי שעוד לא קיבל)</button>
+      <button id="exportBtn">⬇ ייצוא ל־CSV</button>
+    </div>
+    <div id="sendAllPanel" class="sendall-list"></div>
+    <div class="msg" id="sendMsg"></div>
+  </div>
+
+  <div class="box">
+    <h2>מוזמנים</h2>
+    <div class="tools">
+      <input id="search" placeholder="חיפוש לפי שם או קבוצה…">
+      <select id="filter">
+        <option value="">כל הסטטוסים</option>
+        <option value="yes">מגיעים</option>
+        <option value="maybe">אולי</option>
+        <option value="no">לא מגיעים</option>
+        <option value="pending">טרם ענו</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>בית אב</th><th>קבוצה</th><th>טלפון</th><th>מוזמנים</th><th>מגיע?</th><th>כמה</th><th>לינה</th><th>עודכן</th><th>פעולות</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    </div>
+
+    <details>
+      <summary>➕ הוספת בית אב ידנית</summary>
+      <div class="row" style="margin-top:12px">
+        <input id="newName" placeholder="שם בית אב (למשל: נועה וברק)">
+        <input id="newGroup" placeholder="קבוצה (למשל: משפחה)">
+        <input id="newPhone" placeholder="טלפון (05x…)">
+        <input id="newTotal" type="number" min="0" placeholder="כמה הוזמנו">
+      </div>
+      <button class="primary" id="addBtn">הוסף</button>
+    </details>
+
+    <details>
+      <summary>📂 ייבוא מקובץ Excel / CSV (חכם)</summary>
+      <p class="small">המערכת מזהה אוטומטית: שורת כותרת בעברית או אנגלית (שם / טלפון / סה"כ / ילדים), שני עמודי שמות (זוג 1, זוג 2) שמתאחדים לבית אב אחד, שורות כותרת של קבוצה (למשל "משפחה"), פורמטי טלפון שונים, ושורות ריקות או כותרות חוזרות. מספרי טלפון מנורמלים לפורמט בינלאומי. רשומות קיימות מתעדכנות לפי טלפון או שם — תשובות שכבר ניתנו לא נמחקות.</p>
+      <div class="tools">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+        <button class="primary" id="importBtn">ייבא קובץ</button>
+      </div>
+      <div class="msg" id="importMsg"></div>
+    </details>
+  </div>
+
+  <div class="box">
+    <h2>פרטי החתונה ורשימת הציוד</h2>
+    <p class="small">כל מה שתמלאו כאן יופיע בעמוד האורחים. אפשר להשאיר ריק ולהשלים בהמשך.</p>
+    <div class="row">
+      <input id="set_couple_names" placeholder="שמות בני הזוג">
+      <input id="set_wedding_date" placeholder="תאריך (למשל: 12.06.2027)">
+      <input id="set_wedding_time" placeholder="שעה (למשל: 19:30)">
+      <input id="set_venue" placeholder="מקום (למשל: אולם…)">
+      <input id="set_address" placeholder="כתובת">
+    </div>
+    <label class="small">טקסט פתיחה לאורחים</label>
+    <textarea id="set_info_text"></textarea>
+    <label class="small">רשימת ציוד ללינה (מוצגת למי שעונה כן/אולי על לינה)</label>
+    <textarea id="set_packing_list"></textarea>
+    <label class="small">תבנית הודעת וואטסאפ — {name} = שם בית האב, {link} = הקישור האישי</label>
+    <textarea id="set_invite_template"></textarea>
+    <details>
+      <summary>⚙️ חיבור שירות שליחה אוטומטי בוואטסאפ (ZapClaw)</summary>
+      <p class="small">שליחה אוטומטית נעשית דרך ZapClaw (ה־API הרשמי של Meta). ממלאים את מפתח ה־API ואת מספר השולח (בפורמט בינלאומי, למשל 972501234567), שומרים, ואז לוחצים "צור תבניות הודעה" — התבניות נשלחות לאישור Meta (בדרך כלל תוך דקות עד שעות). אחרי האישור, כפתורי "שלח" ישלחו אוטומטית, ומי שיענה כן/אולי על לינה יקבל אוטומטית גם את הודעת רשימת הציוד.</p>
+      <div class="row">
+        <select id="set_whatsapp_provider">
+          <option value="wa_link">קישור וואטסאפ (wa.me) — ברירת מחדל</option>
+          <option value="zapclaw">ZapClaw — שליחה אוטומטית (API רשמי)</option>
+          <option value="gateway">שירות שליחה אוטומטי אחר (gateway)</option>
+        </select>
+        <input id="set_zapclaw_api_key" placeholder="מפתח API של ZapClaw (zc_live_…)">
+        <input id="set_zapclaw_from" placeholder="מספר שולח (972…)" dir="ltr">
+        <input id="set_zapclaw_invite_template" placeholder="שם תבנית ההזמנה">
+        <input id="set_zapclaw_packing_template" placeholder="שם תבנית רשימת הציוד">
+      </div>
+      <div class="row">
+        <input id="set_gateway_url" placeholder="gateway: כתובת ה־API של השירות">
+        <input id="set_gateway_token" placeholder="gateway: מפתח API / טוקן">
+      </div>
+      <button id="createTemplatesBtn" style="margin-top:8px">צור תבניות הודעה ב־ZapClaw</button>
+      <div class="msg" id="templatesMsg"></div>
+    </details>
+    <button class="primary" id="saveSettingsBtn" style="margin-top:12px">שמור הגדרות</button>
+    <div class="msg" id="settingsMsg"></div>
+  </div>
+</div>
+
+<script>
+let DATA = { summary: {}, households: [], settings: {} };
+const $ = id => document.getElementById(id);
+const badge = (v, map) => v ? '<span class="badge ' + (map[v] || 'b-none') + '">' + ({yes:'כן', no:'לא', maybe:'אולי'}[v] || v) + '</span>' : '<span class="badge b-none">טרם ענה</span>';
+
+async function load() {
+  const res = await fetch('/api/admin/overview');
+  DATA = await res.json();
+  render();
+}
+function guestLink(token) { return location.origin + '/?g=' + token; }
+
+function render() {
+  const s = DATA.summary;
+  $('cards').innerHTML = [
+    ['בתי אב', s.households_total], ['ענו', s.responded], ['טרם ענו', s.pending],
+    ['מגיעים (בתים)', s.yes_households], ['מגיעים (אנשים)', s.yes_people],
+    ['אולי (אנשים)', s.maybe_people], ['לא מגיעים', s.no_households],
+    ['נשארים לישון (אנשים)', s.overnight_people], ['סה"כ מוזמנים', s.invited_total],
+  ].map(([l, n]) => '<div class="card"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>').join('');
+  $('providerLabel').textContent =
+    (DATA.settings.whatsapp_provider === 'zapclaw' && DATA.settings.zapclaw_api_key && DATA.settings.zapclaw_from) ? 'שליחה אוטומטית (ZapClaw)' :
+    (DATA.settings.whatsapp_provider === 'gateway' && DATA.settings.gateway_url) ? 'שליחה אוטומטית (gateway)' : 'קישור וואטסאפ (wa.me)';
+  renderTable();
+  // settings form
+  for (const k of ['couple_names','wedding_date','wedding_time','venue','address','info_text','packing_list','invite_template','whatsapp_provider','gateway_url','gateway_token','zapclaw_api_key','zapclaw_from','zapclaw_invite_template','zapclaw_packing_template']) {
+    const el = $('set_' + k); if (el) el.value = DATA.settings[k] || '';
+  }
+}
+function renderTable() {
+  const q = ($('search').value || '').trim();
+  const f = $('filter').value;
+  const rows = DATA.households.filter(h => {
+    if (q && !(h.display_name.includes(q) || (h.group_name || '').includes(q))) return false;
+    if (f === 'pending') return !h.attending;
+    if (f) return h.attending === f;
+    return true;
+  });
+  $('tbody').innerHTML = rows.map(h => '<tr>' +
+    '<td><b>' + h.display_name + '</b></td>' +
+    '<td>' + (h.group_name || '') + '</td>' +
+    '<td dir="ltr" style="text-align:right">' + (h.phone || '—') + '</td>' +
+    '<td>' + (h.invited_total || '') + '</td>' +
+    '<td>' + badge(h.attending, {yes:'b-yes', no:'b-no', maybe:'b-maybe'}) + '</td>' +
+    '<td>' + (h.attending ? h.party_count : '') + '</td>' +
+    '<td>' + (h.overnight ? badge(h.overnight, {yes:'b-yes', no:'b-no', maybe:'b-maybe'}) : '') + '</td>' +
+    '<td class="small">' + (h.updated_at || '') + '</td>' +
+    '<td><button onclick="copyLink(\'' + h.token + '\')">העתק קישור</button> ' +
+    (h.phone ? '<button class="wa" onclick="sendOne(' + h.id + ')">שלח בוואטסאפ</button>' : '<span class="small">אין טלפון</span>') +
+    ' <button onclick="delOne(' + h.id + ')" title="מחק">✕</button></td>' +
+    '</tr>').join('') || '<tr><td colspan="9" class="small">אין תוצאות. הוסיפו מוזמנים או ייבאו קובץ.</td></tr>';
+}
+async function copyLink(token) {
+  try { await navigator.clipboard.writeText(guestLink(token)); alert('הקישור הועתק!'); }
+  catch (e) { prompt('העתיקו את הקישור:', guestLink(token)); }
+}
+async function sendOne(id) {
+  const res = await fetch('/api/admin/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ household_id: id }) });
+  const d = await res.json();
+  if (!res.ok) { alert(d.error || 'שגיאה בשליחה'); return; }
+  if (d.mode === 'wa_link') window.open(d.url, '_blank');
+  else alert(d.status === 'sent' ? 'נשלח אוטומטית ✅' : 'שליחה נכשלה: ' + (d.detail || ''));
+  load();
+}
+async function delOne(id) {
+  if (!confirm('למחוק את בית האב הזה (כולל תשובותיו)?')) return;
+  await fetch('/api/admin/households/' + id, { method: 'DELETE' }); load();
+}
+$('search').addEventListener('input', renderTable);
+$('filter').addEventListener('change', renderTable);
+$('addBtn').addEventListener('click', async () => {
+  const body = { display_name: $('newName').value, group_name: $('newGroup').value, phone: $('newPhone').value, invited_total: $('newTotal').value };
+  if (!body.display_name.trim()) { alert('חסר שם'); return; }
+  await fetch('/api/admin/households', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  $('newName').value = $('newGroup').value = $('newPhone').value = $('newTotal').value = ''; load();
+});
+$('importBtn').addEventListener('click', async () => {
+  const file = $('fileInput').files[0];
+  if (!file) { alert('בחרו קובץ קודם'); return; }
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch('/api/admin/import', { method: 'POST', body: fd });
+  const d = await res.json();
+  const m = $('importMsg');
+  if (!res.ok) { m.textContent = d.error; m.className = 'msg err show'; return; }
+  m.textContent = 'ייבוא הושלם: ' + d.parsed + ' בתי אב זוהו, ' + d.added + ' חדשים, ' + d.updated + ' עודכנו, ' + d.skipped + ' דולגו.' + (d.warnings && d.warnings.length ? '\nהערות:\n' + d.warnings.slice(0, 20).join('\n') : '');
+  m.className = 'msg show'; load();
+});
+$('saveSettingsBtn').addEventListener('click', async () => {
+  const body = {};
+  for (const k of ['couple_names','wedding_date','wedding_time','venue','address','info_text','packing_list','invite_template','whatsapp_provider','gateway_url','gateway_token','zapclaw_api_key','zapclaw_from','zapclaw_invite_template','zapclaw_packing_template']) body[k] = $('set_' + k).value;
+  await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const m = $('settingsMsg'); m.textContent = 'ההגדרות נשמרו ✅'; m.className = 'msg show'; load();
+});
+$('createTemplatesBtn').addEventListener('click', async () => {
+  const m = $('templatesMsg');
+  m.textContent = 'יוצר תבניות…'; m.className = 'msg show';
+  const res = await fetch('/api/admin/zapclaw/create-templates', { method: 'POST' });
+  const d = await res.json();
+  if (!res.ok) { m.textContent = d.error || 'שגיאה ביצירת התבניות'; m.className = 'msg err show'; return; }
+  m.textContent = d.results.map(r => (r.ok ? '✅ ' : '❌ ') + r.name + (r.ok ? ' — נוצרה ונשלחה לאישור Meta' : ' — נכשל: ' + r.detail)).join('\n');
+  m.className = 'msg show';
+});
+$('exportBtn').addEventListener('click', () => { location.href = '/api/admin/export'; });
+$('sendAllBtn').addEventListener('click', () => {
+  const missing = DATA.households.filter(h => h.phone);
+  const panel = $('sendAllPanel');
+  if (!missing.length) { panel.innerHTML = '<p class="small">אין בתי אב עם מספרי טלפון. הוסיפו טלפונים או ייבאו קובץ עם טלפונים.</p>'; return; }
+  panel.innerHTML = '<p class="small">במצב קישור וואטסאפ, כל לחיצה פותחת את וואטסאפ עם הודעה מוכנה — לוחצים "שלח" ועוברים לבא בתור. כשהשליחה האוטומטית פעילה (ZapClaw/gateway), כפתור "שלח את כולם אוטומטית" ישלח את כולם בזה אחר זה.</p>' +
+    missing.map(h => '<div class="item"><b>' + h.display_name + '</b><span dir="ltr">' + h.phone + '</span><button class="wa" onclick="sendOne(' + h.id + ')">שלח</button></div>').join('') +
+    (((DATA.settings.whatsapp_provider === 'gateway' && DATA.settings.gateway_url) || (DATA.settings.whatsapp_provider === 'zapclaw' && DATA.settings.zapclaw_api_key && DATA.settings.zapclaw_from)) ? '<button class="wa" onclick="sendAllAuto()">שלח את כולם אוטומטית</button>' : '');
+});
+async function sendAllAuto() {
+  const missing = DATA.households.filter(h => h.phone);
+  let ok = 0, fail = 0;
+  for (const h of missing) {
+    const res = await fetch('/api/admin/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ household_id: h.id }) });
+    const d = await res.json(); if (d.ok && d.status !== 'failed') ok++; else fail++;
+  }
+  alert('נשלחו: ' + ok + ', נכשלו: ' + fail); load();
+}
+load();
+</script>
+</body>
+</html>
