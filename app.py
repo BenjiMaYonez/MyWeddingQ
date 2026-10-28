@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Wedding RSVP app: per-household guest links + couple admin dashboard.
 
-Stack: Flask + SQLite (zero external services required).
+Stack: Flask + SQLite locally, or Postgres (e.g. Neon) when the
+DATABASE_URL environment variable is set — see the DB section below.
 Run locally:  python app.py   (serves on http://127.0.0.1:5000)
 Deploy: see render.yaml / Procfile / README.md
 """
@@ -24,7 +25,129 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 # ---------------------------------------------------------------- DB ----
 
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+USE_PG = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+SEED_PATH = os.path.join(BASE_DIR, "seed_data.json")
+
+
+class _Row:
+    """Row with sqlite3.Row-style access: row["col"], row[0], dict(row)."""
+
+    __slots__ = ("_keys", "_values", "_index")
+
+    def __init__(self, keys, values):
+        self._keys = list(keys)
+        self._values = tuple(values)
+        self._index = {}
+        for i, k in enumerate(self._keys):
+            self._index.setdefault(k, i)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return self._values[self._index[key]]
+
+    def keys(self):
+        return list(self._keys)
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self):
+        return len(self._values)
+
+
+class _PgCursor:
+    """Wraps a psycopg cursor so fetchone/fetchall return _Row objects."""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def _wrap(self, values):
+        if values is None:
+            return None
+        keys = [d.name for d in self._cursor.description]
+        return _Row(keys, values)
+
+    def fetchone(self):
+        return self._wrap(self._cursor.fetchone())
+
+    def fetchall(self):
+        return [self._wrap(v) for v in self._cursor.fetchall()]
+
+
+class _PgConnection:
+    """Minimal sqlite3-connection lookalike backed by psycopg (v3).
+
+    SQL is written once with sqlite-style '?' placeholders; they are
+    translated to psycopg '%s' here so the rest of the app is unchanged.
+    """
+
+    def __init__(self, dsn):
+        import psycopg
+
+        self._conn = psycopg.connect(dsn)
+
+    def execute(self, sql, params=()):
+        cur = self._conn.cursor()
+        cur.execute(sql.replace("?", "%s"), tuple(params) if params else None)
+        return _PgCursor(cur)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+
+# Postgres schema. Differences from the SQLite DDL below: BIGSERIAL
+# instead of INTEGER PRIMARY KEY AUTOINCREMENT, and created/updated
+# timestamp defaults rendered as 'YYYY-MM-DD HH:MM:SS' text (UTC) so the
+# stored format matches what SQLite's CURRENT_TIMESTAMP produces.
+_PG_TS = "(to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'))"
+_PG_DDL = [
+    """
+    CREATE TABLE IF NOT EXISTS households (
+        id BIGSERIAL PRIMARY KEY,
+        token TEXT UNIQUE NOT NULL,
+        display_name TEXT NOT NULL,
+        group_name TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        invited_total INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT %s
+    )
+    """ % _PG_TS,
+    """
+    CREATE TABLE IF NOT EXISTS responses (
+        household_id BIGINT PRIMARY KEY REFERENCES households(id),
+        attending TEXT DEFAULT '',
+        party_count INTEGER DEFAULT 0,
+        overnight TEXT DEFAULT '',
+        updated_at TEXT DEFAULT %s
+    )
+    """ % _PG_TS,
+    """
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS send_log (
+        id BIGSERIAL PRIMARY KEY,
+        household_id BIGINT,
+        channel TEXT,
+        status TEXT,
+        detail TEXT,
+        created_at TEXT DEFAULT %s
+    )
+    """ % _PG_TS,
+]
+
+
 def db():
+    if USE_PG:
+        return _PgConnection(DATABASE_URL)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -32,7 +155,11 @@ def db():
 
 def init_db():
     conn = db()
-    conn.executescript(
+    if USE_PG:
+        for _stmt in _PG_DDL:
+            conn.execute(_stmt)
+    else:
+        conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS households (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,12 +220,57 @@ def init_db():
         "zapclaw_invite_template": "wedding_invitation",
         "zapclaw_packing_template": "wedding_packing_list",
     }
+    insert_default = (
+        "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT DO NOTHING"
+        if USE_PG
+        else "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)"
+    )
     for key, value in defaults.items():
-        conn.execute(
-            "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value)
-        )
+        conn.execute(insert_default, (key, value))
+    if USE_PG:
+        _seed_pg_if_empty(conn)
     conn.commit()
     conn.close()
+
+
+def _seed_pg_if_empty(conn):
+    """One-time import of seed_data.json into a fresh Postgres database.
+
+    Runs only on Postgres, only while the households table is empty, so
+    restarts never duplicate the seed. seed_data.json was generated from
+    the last known-good local wedding.db (all households including their
+    tokens, plus all settings rows).
+    """
+    if not os.path.exists(SEED_PATH):
+        return
+    count = conn.execute("SELECT COUNT(*) FROM households").fetchone()[0]
+    if count:
+        return
+    with open(SEED_PATH, encoding="utf-8") as f:
+        seed = json.load(f)
+    households = seed.get("households", [])
+    for h in households:
+        conn.execute(
+            """INSERT INTO households
+               (id, token, display_name, group_name, phone, invited_total, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (h["id"], h["token"], h["display_name"], h.get("group_name") or "",
+             h.get("phone") or "", h.get("invited_total") or 0,
+             h.get("created_at")),
+        )
+    for row in seed.get("settings", []):
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (row["key"], row["value"]),
+        )
+    if households:
+        # Explicitly seeded ids do not advance the BIGSERIAL sequence;
+        # move it past the seeded max so future inserts cannot collide.
+        conn.execute(
+            "SELECT setval(pg_get_serial_sequence('households', 'id'), "
+            "(SELECT MAX(id) FROM households))"
+        )
 
 
 def get_settings():

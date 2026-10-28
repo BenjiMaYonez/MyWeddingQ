@@ -1,0 +1,324 @@
+{
+ "households": [
+  {
+   "id": 1,
+   "token": "qYwPT1gwifMg",
+   "display_name": "אבא ו־אמא",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 2,
+   "token": "K3D5a5DaXwqI",
+   "display_name": "נועה ו־ברק",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 3,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 3,
+   "token": "cAWzzZwXYRbT",
+   "display_name": "ניר",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 1,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 4,
+   "token": "Ee3ltN6F7AC5",
+   "display_name": "הדס ו־דרור",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 4,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 5,
+   "token": "L91r0n6bBsMx",
+   "display_name": "אליהו ו־אביטל",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 6,
+   "token": "Ik8WRJSefC3e",
+   "display_name": "אבי ו־אורלי",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 7,
+   "token": "8Eq68ud0h3mb",
+   "display_name": "עידו ו־רועי",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 8,
+   "token": "VkEIxvGkvMTn",
+   "display_name": "עמית ו־קארין",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 4,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 9,
+   "token": "k2yLPqHMI9d4",
+   "display_name": "לירון ו־פז",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 5,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 10,
+   "token": "YOeg6BW2fmGl",
+   "display_name": "ליאת ו־עידן",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 5,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 11,
+   "token": "wpIAwhjJVKGc",
+   "display_name": "איילת ו־ירון",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 5,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 12,
+   "token": "3A8hpBhvGY5v",
+   "display_name": "רחל ו־חיליק",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 13,
+   "token": "cEtv5sU0hEU9",
+   "display_name": "שוש",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 1,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 14,
+   "token": "eDajeShZcnrg",
+   "display_name": "אבי ו־רבקה",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 15,
+   "token": "uvh9KvgqKWkE",
+   "display_name": "בן ו־אישתו",
+   "group_name": "משפחה בנג'י",
+   "phone": "",
+   "invited_total": 3,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 16,
+   "token": "KHj0VmNoH1B6",
+   "display_name": "טובי ו־יוסי",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 17,
+   "token": "ugTWjxk5OJ8C",
+   "display_name": "נועה  פקט ו־גיא",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 18,
+   "token": "ZyDFPU6lTH68",
+   "display_name": "נטע פקט ו־נטע",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 19,
+   "token": "6f7AOG4nkYlc",
+   "display_name": "אלה פקט ו־בעלה",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 20,
+   "token": "oRyyTVGBfe3h",
+   "display_name": "נורית ו־אייל",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 21,
+   "token": "Vty2f4JEgHvu",
+   "display_name": "דויד ו־פנינה",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 22,
+   "token": "UYP0hCiryCad",
+   "display_name": "דוד ו־לבנה",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 23,
+   "token": "0taDwXeRK901",
+   "display_name": "ליטו ו־נורה",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 24,
+   "token": "uutGaQ38VD4z",
+   "display_name": "אסתי ו־יניב",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 25,
+   "token": "pF3Xs3S7bmyE",
+   "display_name": "צילה ו־צוקי",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 26,
+   "token": "PkZWQunKL62U",
+   "display_name": "אפרת ו־אבישי",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 27,
+   "token": "E2ItmS7czlfS",
+   "display_name": "רונית ו־יורם",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 28,
+   "token": "GDgHDYijnR7T",
+   "display_name": "שלומית",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 1,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 29,
+   "token": "OhrbPcfNU2PN",
+   "display_name": "אמיתי ו־סמדר",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  },
+  {
+   "id": 30,
+   "token": "9sJ2cDan6VeD",
+   "display_name": "שי ו־אורי",
+   "group_name": "חברים הורים בנגי",
+   "phone": "",
+   "invited_total": 2,
+   "created_at": "2026-10-24 07:54:40"
+  }
+ ],
+ "settings": [
+  {
+   "key": "address",
+   "value": ""
+  },
+  {
+   "key": "couple_names",
+   "value": "שם החתן ושם הכלה"
+  },
+  {
+   "key": "gateway_template",
+   "value": ""
+  },
+  {
+   "key": "gateway_token",
+   "value": ""
+  },
+  {
+   "key": "gateway_url",
+   "value": ""
+  },
+  {
+   "key": "info_text",
+   "value": "אנחנו מתחתנים! נשמח לחגוג איתכם את היום המיוחד שלנו. אנא אשרו הגעה בקישור האישי שלכם."
+  },
+  {
+   "key": "invite_template",
+   "value": "היי {name}! 💍 אנחנו מתחתנים! נשמח שתאשרו הגעה בקישור האישי שלכם: {link}"
+  },
+  {
+   "key": "packing_list",
+   "value": "רשימת ציוד ללינה (רשימה זמנית, תוחלף בהמשך):\n• בגדים להחלפה ליום שאחרי\n• פיג'מה\n• מברשת שיניים ומוצרי טיפוח\n• מגבת\n• נעליים נוחות\n• בגד ים (אם יש בריכה)\n• תרופות אישיות\n• מטען לטלפון\n• קרם הגנה וכובע"
+  },
+  {
+   "key": "venue",
+   "value": ""
+  },
+  {
+   "key": "wedding_date",
+   "value": ""
+  },
+  {
+   "key": "wedding_time",
+   "value": ""
+  },
+  {
+   "key": "whatsapp_provider",
+   "value": "wa_link"
+  }
+ ]
+}
