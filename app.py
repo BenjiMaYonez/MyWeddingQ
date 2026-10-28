@@ -664,6 +664,7 @@ def api_admin_edit(hid):
     conn = db()
     if request.method == "DELETE":
         conn.execute("DELETE FROM responses WHERE household_id = ?", (hid,))
+        conn.execute("DELETE FROM send_jobs WHERE household_id = ?", (hid,))
         conn.execute("DELETE FROM households WHERE id = ?", (hid,))
         conn.commit()
         conn.close()
