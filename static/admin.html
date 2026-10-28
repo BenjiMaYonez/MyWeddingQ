@@ -125,6 +125,7 @@
           <option value="wa_link">קישור וואטסאפ (wa.me) — ברירת מחדל</option>
           <option value="zapclaw">ZapClaw — שליחה אוטומטית (API רשמי)</option>
           <option value="gateway">שירות שליחה אוטומטי אחר (gateway)</option>
+          <option value="relay">Relay — תור שליחה (שירות מקומי מושך משימות)</option>
         </select>
         <input id="set_zapclaw_api_key" placeholder="מפתח API של ZapClaw (zc_live_…)">
         <input id="set_zapclaw_from" placeholder="מספר שולח (972…)" dir="ltr">
@@ -134,6 +135,9 @@
       <div class="row">
         <input id="set_gateway_url" placeholder="gateway: כתובת ה־API של השירות">
         <input id="set_gateway_token" placeholder="gateway: מפתח API / טוקן">
+      </div>
+      <div class="row">
+        <input id="set_relay_key" placeholder="relay: מפתח סודי משותף (X-Relay-Key)" dir="ltr">
       </div>
       <button id="createTemplatesBtn" style="margin-top:8px">צור תבניות הודעה ב־ZapClaw</button>
       <div class="msg" id="templatesMsg"></div>
@@ -164,11 +168,12 @@ function render() {
     ['נשארים לישון (אנשים)', s.overnight_people], ['סה"כ מוזמנים', s.invited_total],
   ].map(([l, n]) => '<div class="card"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>').join('');
   $('providerLabel').textContent =
+    (DATA.settings.whatsapp_provider === 'relay' && DATA.settings.relay_key) ? 'שליחה אוטומטית (relay — תור שליחה)' :
     (DATA.settings.whatsapp_provider === 'zapclaw' && DATA.settings.zapclaw_api_key && DATA.settings.zapclaw_from) ? 'שליחה אוטומטית (ZapClaw)' :
     (DATA.settings.whatsapp_provider === 'gateway' && DATA.settings.gateway_url) ? 'שליחה אוטומטית (gateway)' : 'קישור וואטסאפ (wa.me)';
   renderTable();
   // settings form
-  for (const k of ['couple_names','wedding_date','wedding_time','venue','address','info_text','packing_list','invite_template','whatsapp_provider','gateway_url','gateway_token','zapclaw_api_key','zapclaw_from','zapclaw_invite_template','zapclaw_packing_template']) {
+  for (const k of ['couple_names','wedding_date','wedding_time','venue','address','info_text','packing_list','invite_template','whatsapp_provider','gateway_url','gateway_token','relay_key','zapclaw_api_key','zapclaw_from','zapclaw_invite_template','zapclaw_packing_template']) {
     const el = $('set_' + k); if (el) el.value = DATA.settings[k] || '';
   }
 }
@@ -204,6 +209,7 @@ async function sendOne(id) {
   const d = await res.json();
   if (!res.ok) { alert(d.error || 'שגיאה בשליחה'); return; }
   if (d.mode === 'wa_link') window.open(d.url, '_blank');
+  else if (d.queued) alert('נכנס לתור שליחה ✅');
   else alert(d.status === 'sent' ? 'נשלח אוטומטית ✅' : 'שליחה נכשלה: ' + (d.detail || ''));
   load();
 }
@@ -232,7 +238,7 @@ $('importBtn').addEventListener('click', async () => {
 });
 $('saveSettingsBtn').addEventListener('click', async () => {
   const body = {};
-  for (const k of ['couple_names','wedding_date','wedding_time','venue','address','info_text','packing_list','invite_template','whatsapp_provider','gateway_url','gateway_token','zapclaw_api_key','zapclaw_from','zapclaw_invite_template','zapclaw_packing_template']) body[k] = $('set_' + k).value;
+  for (const k of ['couple_names','wedding_date','wedding_time','venue','address','info_text','packing_list','invite_template','whatsapp_provider','gateway_url','gateway_token','relay_key','zapclaw_api_key','zapclaw_from','zapclaw_invite_template','zapclaw_packing_template']) body[k] = $('set_' + k).value;
   await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const m = $('settingsMsg'); m.textContent = 'ההגדרות נשמרו ✅'; m.className = 'msg show'; load();
 });
@@ -252,16 +258,16 @@ $('sendAllBtn').addEventListener('click', () => {
   if (!missing.length) { panel.innerHTML = '<p class="small">אין בתי אב עם מספרי טלפון. הוסיפו טלפונים או ייבאו קובץ עם טלפונים.</p>'; return; }
   panel.innerHTML = '<p class="small">במצב קישור וואטסאפ, כל לחיצה פותחת את וואטסאפ עם הודעה מוכנה — לוחצים "שלח" ועוברים לבא בתור. כשהשליחה האוטומטית פעילה (ZapClaw/gateway), כפתור "שלח את כולם אוטומטית" ישלח את כולם בזה אחר זה.</p>' +
     missing.map(h => '<div class="item"><b>' + h.display_name + '</b><span dir="ltr">' + h.phone + '</span><button class="wa" onclick="sendOne(' + h.id + ')">שלח</button></div>').join('') +
-    (((DATA.settings.whatsapp_provider === 'gateway' && DATA.settings.gateway_url) || (DATA.settings.whatsapp_provider === 'zapclaw' && DATA.settings.zapclaw_api_key && DATA.settings.zapclaw_from)) ? '<button class="wa" onclick="sendAllAuto()">שלח את כולם אוטומטית</button>' : '');
+    (((DATA.settings.whatsapp_provider === 'gateway' && DATA.settings.gateway_url) || (DATA.settings.whatsapp_provider === 'zapclaw' && DATA.settings.zapclaw_api_key && DATA.settings.zapclaw_from) || (DATA.settings.whatsapp_provider === 'relay' && DATA.settings.relay_key)) ? '<button class="wa" onclick="sendAllAuto()">שלח את כולם אוטומטית</button>' : '');
 });
 async function sendAllAuto() {
   const missing = DATA.households.filter(h => h.phone);
-  let ok = 0, fail = 0;
+  let ok = 0, fail = 0, queued = 0;
   for (const h of missing) {
     const res = await fetch('/api/admin/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ household_id: h.id }) });
-    const d = await res.json(); if (d.ok && d.status !== 'failed') ok++; else fail++;
+    const d = await res.json(); if (d.queued) queued++; else if (d.ok && d.status !== 'failed') ok++; else fail++;
   }
-  alert('נשלחו: ' + ok + ', נכשלו: ' + fail); load();
+  alert(queued ? 'נכנסו לתור שליחה: ' + queued + (fail ? ', נכשלו: ' + fail : '') : 'נשלחו: ' + ok + ', נכשלו: ' + fail); load();
 }
 load();
 </script>
