@@ -14,7 +14,9 @@ import re
 import secrets
 import sqlite3
 import string
+import sys
 from datetime import datetime
+from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -142,6 +144,20 @@ _PG_DDL = [
         created_at TEXT DEFAULT %s
     )
     """ % _PG_TS,
+    """
+    CREATE TABLE IF NOT EXISTS send_jobs (
+        id BIGSERIAL PRIMARY KEY,
+        household_id BIGINT REFERENCES households(id),
+        kind TEXT,
+        to_phone TEXT,
+        message TEXT,
+        status TEXT DEFAULT 'pending',
+        provider_message_id TEXT,
+        error TEXT,
+        created_at TEXT DEFAULT %s,
+        updated_at TEXT DEFAULT %s
+    )
+    """ % (_PG_TS, _PG_TS),
 ]
 
 
@@ -189,6 +205,18 @@ def init_db():
             detail TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS send_jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            household_id INTEGER REFERENCES households(id),
+            kind TEXT,
+            to_phone TEXT,
+            message TEXT,
+            status TEXT DEFAULT 'pending',
+            provider_message_id TEXT,
+            error TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
         """
     )
     defaults = {
@@ -215,6 +243,7 @@ def init_db():
         "gateway_url": "",
         "gateway_token": "",
         "gateway_template": "",
+        "relay_key": "",
         "zapclaw_api_key": "",
         "zapclaw_from": "",
         "zapclaw_invite_template": "wedding_invitation",
@@ -767,10 +796,88 @@ def zapclaw_send_template(settings, to_phone, template_name, params):
     return zapclaw_request(settings, "/send/template", payload)
 
 
+# -------------------------------------------------------------- relay ----
+
+def _relay_authorized():
+    """True when the request carries the shared relay key. An empty
+    relay_key setting disables the relay API (every request → 401)."""
+    expected = get_settings().get("relay_key", "")
+    provided = request.headers.get("X-Relay-Key", "")
+    if not expected or not provided:
+        return False
+    return secrets.compare_digest(provided, expected)
+
+
+def enqueue_send_job(household_id, kind, to_phone, message, once=False):
+    """Queue a send job for the relay worker.
+
+    Dedupe: never create a second job while one for the same
+    household+kind is still pending. With once=True (packing list) an
+    already-sent job also blocks a new one — the once-only semantics of
+    the direct packing path, carried into the jobs table.
+    """
+    conn = db()
+    if once:
+        existing = conn.execute(
+            "SELECT id FROM send_jobs WHERE household_id = ? AND kind = ? "
+            "AND status IN ('pending', 'sent')",
+            (household_id, kind),
+        ).fetchone()
+    else:
+        existing = conn.execute(
+            "SELECT id FROM send_jobs WHERE household_id = ? AND kind = ? "
+            "AND status = 'pending'",
+            (household_id, kind),
+        ).fetchone()
+    if not existing:
+        conn.execute(
+            "INSERT INTO send_jobs (household_id, kind, to_phone, message, status) "
+            "VALUES (?, ?, ?, ?, 'pending')",
+            (household_id, kind, to_phone, message),
+        )
+        conn.commit()
+    conn.close()
+
+
+def render_packing_message(settings, display_name, link):
+    """Render the packing-list message text exactly as the direct
+    (ZapClaw template) mode produces it, with name + link filled in."""
+    name = settings.get("zapclaw_packing_template", "wedding_packing_list")
+    body = ""
+    for tpl in ZAPCLAW_TEMPLATES:
+        if tpl["name"] == name:
+            body = tpl["bodyText"]
+            break
+    if not body:
+        body = ZAPCLAW_TEMPLATES[1]["bodyText"]
+    return body.replace("{{1}}", display_name).replace("{{2}}", link)
+
+
 def maybe_send_packing(household_id, base_url):
-    """Auto-send the packing-list template (ZapClaw mode only, once per
-    household) when a guest answers yes/maybe on the overnight question."""
+    """Auto-send the packing list (once per household) when a guest
+    answers yes/maybe on the overnight question. ZapClaw mode sends the
+    template directly; relay mode queues a fully rendered send job for
+    the external worker instead."""
     settings = get_settings()
+    if settings.get("whatsapp_provider") == "relay":
+        conn = db()
+        h = conn.execute(
+            "SELECT * FROM households WHERE id = ?", (household_id,)
+        ).fetchone()
+        already = conn.execute(
+            "SELECT id FROM send_log WHERE household_id = ? "
+            "AND channel = 'relay_packing' AND status = 'sent'",
+            (household_id,),
+        ).fetchone()
+        conn.close()
+        if not h or not h["phone"] or already:
+            return
+        link = "{}?g={}".format(base_url, h["token"])
+        message = render_packing_message(
+            settings, h["display_name"], link)
+        enqueue_send_job(household_id, "packing", h["phone"], message,
+                         once=True)
+        return
     if settings.get("whatsapp_provider") != "zapclaw":
         return
     if not settings.get("zapclaw_api_key") or not settings.get("zapclaw_from"):
@@ -830,6 +937,8 @@ def api_admin_send():
       from their own WhatsApp in one tap.
     - gateway: POSTs {phone, message} to a configured HTTP gateway
       (WAHA / Evolution API / Ultramsg-style) and sends automatically.
+    - relay: queues a send job in send_jobs; an external worker pulls
+      it via /api/relay/jobs, sends it, and posts the result back.
     """
     data = request.get_json(force=True)
     hid = data.get("household_id")
@@ -846,6 +955,9 @@ def api_admin_send():
     message = settings.get("invite_template", "").replace(
         "{name}", h["display_name"]).replace("{link}", link)
     provider = settings.get("whatsapp_provider", "wa_link")
+    if provider == "relay":
+        enqueue_send_job(hid, "invite", h["phone"], message)
+        return jsonify({"ok": True, "queued": True, "mode": "relay"})
     if provider == "zapclaw" and settings.get("zapclaw_api_key") \
             and settings.get("zapclaw_from"):
         ok, detail = zapclaw_send_template(
@@ -898,6 +1010,70 @@ def api_admin_send():
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "mode": "wa_link", "url": url})
+
+
+@app.route("/api/relay/jobs")
+def api_relay_jobs():
+    """Pending send jobs for the external relay worker, oldest first."""
+    if not _relay_authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    conn = db()
+    rows = conn.execute(
+        "SELECT id, household_id, kind, to_phone, message FROM send_jobs "
+        "WHERE status = 'pending' ORDER BY id ASC LIMIT 20"
+    ).fetchall()
+    conn.close()
+    return jsonify({"jobs": [{
+        "id": r["id"], "household_id": r["household_id"],
+        "kind": r["kind"], "to": r["to_phone"], "message": r["message"],
+    } for r in rows]})
+
+
+@app.route("/api/relay/jobs/<int:job_id>/result", methods=["POST"])
+def api_relay_job_result(job_id):
+    """Record a relay worker's send outcome for one job.
+
+    Bookkeeping mirrors the direct send paths in the messages log
+    (send_log): invites log under channel 'relay', packing under
+    'relay_packing' — whose 'sent' rows are also the packing once-only
+    guard, exactly like the 'zapclaw_packing' rows in direct mode. The
+    send_log row (with its created_at) is the invite/packing "sent at"
+    record, same as in the direct paths, which keep no separate
+    timestamp column either.
+    """
+    if not _relay_authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    status = data.get("status", "")
+    if status not in ("sent", "failed"):
+        return jsonify({"error": "סטטוס לא תקין"}), 400
+    provider_message_id = data.get("provider_message_id") or None
+    error = data.get("error") or None
+    conn = db()
+    job = conn.execute(
+        "SELECT * FROM send_jobs WHERE id = ?", (job_id,)
+    ).fetchone()
+    if not job:
+        conn.close()
+        return jsonify({"error": "משימת שליחה לא נמצאה"}), 404
+    was_pending = job["status"] == "pending"
+    conn.execute(
+        "UPDATE send_jobs SET status = ?, provider_message_id = ?, "
+        "error = ?, updated_at = ? WHERE id = ?",
+        (status, provider_message_id, error,
+         datetime.now().isoformat(timespec="seconds"), job_id),
+    )
+    if was_pending:
+        channel = "relay" if job["kind"] == "invite" else "relay_packing"
+        detail = provider_message_id if status == "sent" else (error or "")
+        conn.execute(
+            "INSERT INTO send_log (household_id, channel, status, detail) "
+            "VALUES (?, ?, ?, ?)",
+            (job["household_id"], channel, status, detail),
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/export")
